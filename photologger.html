@@ -68,7 +68,6 @@
 </head>
 <body>
   <div class="toolbar">
-    <button id="resetBtn" title="Reset counter to 1">Reset</button>
     <button id="fullscreenBtn" title="Toggle fullscreen (F)">Fullscreen</button>
   </div>
 
@@ -86,7 +85,6 @@
     const $counter = document.getElementById('counter');
     const $plus = document.getElementById('plusBtn');
     const $minus = document.getElementById('minusBtn');
-    const $reset = document.getElementById('resetBtn');
     const $fs = document.getElementById('fullscreenBtn');
 
     async function fetchState() {
@@ -117,8 +115,6 @@
         } else if (path.includes('decrement')) {
           const n = Math.max(1, Number(localStorage.getItem('photologger_count') || 1) - 1);
           localStorage.setItem('photologger_count', String(n));
-        } else if (path.includes('reset')) {
-          localStorage.setItem('photologger_count', '1');
         }
       } finally {
         fetchState();
@@ -127,12 +123,10 @@
 
     $plus.addEventListener('click', () => post('/api/increment'));
     $minus.addEventListener('click', () => post('/api/decrement'));
-    $reset.addEventListener('click', () => post('/api/reset'));
     document.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') { e.preventDefault(); post('/api/increment'); }
       if (e.key === 'ArrowLeft')  { e.preventDefault(); post('/api/decrement'); }
       if (e.key.toLowerCase() === 'f') toggleFullscreen();
-      if (e.key.toLowerCase() === 'r') post('/api/reset');
     });
 
     function toggleFullscreen() {
