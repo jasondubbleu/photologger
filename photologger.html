@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Photo Logger</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #0f0f10;
+      color: #f5f5f5;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      overflow: hidden;
+    }
+    .wrap {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      justify-items: center;
+      gap: 3rem;
+      padding: 2rem;
+    }
+    button {
+      font-size: clamp(24px, 6vw, 64px);
+      padding: 1rem 2rem;
+      border-radius: 1rem;
+      border: 2px solid #3a3a3d;
+      background: #1a1b1e;
+      color: #fff;
+      cursor: pointer;
+      transition: transform 0.05s ease, background 0.2s ease, border-color 0.2s ease;
+      min-width: 9rem;
+    }
+    button:hover { background: #222328; border-color: #4a4a4e; }
+    button:active { transform: scale(0.98); }
+    .counter {
+      font-size: clamp(80px, 14vw, 220px);
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: 0.05em;
+      min-width: 8ch;
+      text-align: center;
+    }
+    .meta {
+      position: fixed;
+      bottom: 12px;
+      right: 16px;
+      opacity: 0.7;
+      font-size: 14px;
+    }
+    .toolbar {
+      position: fixed;
+      top: 12px;
+      right: 16px;
+      display: flex;
+      gap: 8px;
+      opacity: 0.9;
+    }
+    .toolbar button {
+      font-size: 16px;
+      padding: 0.5rem 0.8rem;
+      min-width: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button id="resetBtn" title="Reset counter to 1">Reset</button>
+    <button id="fullscreenBtn" title="Toggle fullscreen (F)">Fullscreen</button>
+  </div>
+
+  <div class="wrap">
+    <button id="minusBtn" aria-label="Decrement" title="Left Arrow">−</button>
+    <div id="counter" class="counter" aria-live="polite" aria-atomic="true">1</div>
+    <button id="plusBtn" aria-label="Increment" title="Right Arrow">+</button>
+  </div>
+
+  <div class="meta">
+    Arrow keys: Left/Right • Click buttons • Counter syncs with local watcher
+  </div>
+
+  <script>
+    const $counter = document.getElementById('counter');
+    const $plus = document.getElementById('plusBtn');
+    const $minus = document.getElementById('minusBtn');
+    const $reset = document.getElementById('resetBtn');
+    const $fs = document.getElementById('fullscreenBtn');
+
+    async function fetchState() {
+      try {
+        const r = await fetch('http://127.0.0.1:8000/api/state');
+        if (!r.ok) return;
+        const data = await r.json();
+        $counter.textContent = data.current_count ?? 1;
+      } catch(e) {
+        // If server not running, fall back to localStorage
+        const local = Number(localStorage.getItem('photologger_count') || 1);
+        $counter.textContent = local;
+      }
+    }
+
+    async function post(path, payload) {
+      try {
+        await fetch('http://127.0.0.1:8000' + path, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: payload ? JSON.stringify(payload) : null
+        });
+      } catch(e) {
+        // Fallback: store locally so the counter is still usable visually.
+        if (path.includes('increment')) {
+          const n = Number(localStorage.getItem('photologger_count') || 1) + 1;
+          localStorage.setItem('photologger_count', String(n));
+        } else if (path.includes('decrement')) {
+          const n = Math.max(1, Number(localStorage.getItem('photologger_count') || 1) - 1);
+          localStorage.setItem('photologger_count', String(n));
+        } else if (path.includes('reset')) {
+          localStorage.setItem('photologger_count', '1');
+        }
+      } finally {
+        fetchState();
+      }
+    }
+
+    $plus.addEventListener('click', () => post('/api/increment'));
+    $minus.addEventListener('click', () => post('/api/decrement'));
+    $reset.addEventListener('click', () => post('/api/reset'));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') { e.preventDefault(); post('/api/increment'); }
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); post('/api/decrement'); }
+      if (e.key.toLowerCase() === 'f') toggleFullscreen();
+      if (e.key.toLowerCase() === 'r') post('/api/reset');
+    });
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(()=>{});
+      } else {
+        document.exitFullscreen().catch(()=>{});
+      }
+    }
+    $fs.addEventListener('click', toggleFullscreen);
+
+    // Keep in sync with server (or local fallback)
+    fetchState();
+    setInterval(fetchState, 1000);
+  </script>
+</body>
+</html>
