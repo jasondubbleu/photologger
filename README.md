@@ -1,4 +1,4 @@
-Hey! Welcome to the PhotoLogger README. It's pretty simple. Scroll to the bottom for directions
+Hey! Welcome to the PhotoLogger README. It's pretty simple.
 
 Description:
 PhotoLogger automatically renames photos from a camera as they’re imported.
