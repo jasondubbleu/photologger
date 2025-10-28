@@ -155,23 +155,58 @@ def wait_until_stable(p: Path, min_age: float = 0.75, checks: int = 3, interval:
         time.sleep(interval)
     return False
     
-# --- Auto-launch Canon EOS Utility from shortcut ----------------------------
-import os, subprocess
-from pathlib import Path
+# --- Auto-launch Canon EOS Utility ------------------------------------------
+def _canon_running() -> bool:
+    try:
+        out = subprocess.run(["tasklist"], capture_output=True, text=True, timeout=5)
+        txt = out.stdout.lower()
+        # cover common variants
+        needles = {
+            "eos utility.exe",
+            "eosutility.exe",
+            "eos utility3.exe",
+            "eosutility3.exe",
+        }
+        return any(n in txt for n in needles)
+    except Exception:
+        return False
 
 def launch_eos_utility():
-    shortcut = Path(__file__).with_name("EOS Utility.lnk")
-    if not shortcut.exists():
-        print(f"[PhotoLogger] Shortcut not found: {shortcut}")
-        return False
-    try:
-        os.startfile(shortcut)  # opens via Windows shell, works for .lnk
-        print(f"[PhotoLogger] Launched EOS Utility via shortcut: {shortcut}")
+    # If it's truly running, say so and move on
+    if _canon_running():
+        print("[PhotoLogger] EOS Utility appears to be running already.")
         return True
-    except Exception as e:
-        print(f"[PhotoLogger] Failed to launch EOS Utility: {e}")
-        return False
-# ---------------------------------------------------------------------------
+
+    # Your stated path first
+    candidates = [
+        r"C:\Program Files (x86)\Canon\EOS Utility\EOS Utility.exe",
+        # Some installs put the v3 binary under EU3:
+        r"C:\Program Files (x86)\Canon\EOS Utility\EU3\EOS Utility.exe",
+        # 64-bit Program Files variants just in case:
+        r"C:\Program Files\Canon\EOS Utility\EOS Utility.exe",
+        r"C:\Program Files\Canon\EOS Utility\EU3\EOS Utility.exe",
+    ]
+
+    # Also check PATH just in case (rare)
+    path_hit = shutil.which("EOSUtility.exe") or shutil.which("EOS Utility.exe")
+    if path_hit:
+        candidates.insert(0, path_hit)
+
+    for exe in candidates:
+        if Path(exe).exists():
+            try:
+                subprocess.Popen([exe], close_fds=True)
+                print(f"[PhotoLogger] Launched EOS Utility: {exe}")
+                return True
+            except Exception as e:
+                print(f"[PhotoLogger] Failed launching EOS Utility at {exe}: {e}")
+
+    print("[PhotoLogger] Could not find EOS Utility executable.")
+    print("  Checked:")
+    for c in candidates:
+        print("   -", c)
+    print("  If installed elsewhere, update launch_eos_utility() with the exact .exe path.")
+    return False
 
 class PhotoHandler(FileSystemEventHandler):
     def _process_path(self, path_str: str):
